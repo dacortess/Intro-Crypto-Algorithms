@@ -6,7 +6,6 @@ from nltk.corpus import words
 from collections import Counter
 import math
 nltk.download('words')
-
 def decrypt_caesar(value: str) -> str:
     value = value.upper()
     possible_values = list()
@@ -18,16 +17,16 @@ def decrypt_caesar(value: str) -> str:
             if n_char == 32: continue
             new_value += chr(((n_char - 65 - key) % 26) + 65)
         possible_values.append((str(new_value), str(key)))
-
+        
     mejor_palabra = get_most_english_string_letter_freq([x[0] for x in possible_values])
     return possible_values, mejor_palabra
 
-def inverso(num: int) -> int:
-    for inv in range(0,26):
-        if (num*inv) % 26 == 1:
-            return inv
-
 def decrypt_afin(value: str) -> str:
+
+    def inverso(num: int) -> int:
+        for inv in range(0,26):
+            if (num*inv) % 26 == 1:
+                return inv
 
     value = value.upper()
     possible_values = list()
@@ -40,13 +39,14 @@ def decrypt_afin(value: str) -> str:
                 n_char = ord(char)
                 if n_char == 32: continue
                 new_value += chr(((key_a * (n_char - 65 - key_b)) % 26) + 65)
-
+            
             possible_values.append((str(new_value), str(inverso(key_a)), str(key_b)))
 
     mejor_palabra = get_most_english_string_letter_freq([x[0] for x in possible_values])
     return possible_values, mejor_palabra
 
 def decrypt_RSA(value: str, n:int, b:str) ->str:
+    pass
     value = value.upper()
     new_value = ''
     n = int(n)
@@ -55,8 +55,7 @@ def decrypt_RSA(value: str, n:int, b:str) ->str:
         char = int(char)
         if char == 32: continue
         new_value += chr(((char - 65)**b % n) + 65)
-    return [], new_value
-
+    return new_value
 
 def decrypt_permutation(value:str, m:str) -> str:
     #List all the inverse permutations
@@ -64,7 +63,7 @@ def decrypt_permutation(value:str, m:str) -> str:
     value = value.upper()
     values = list()
     new_value = ''
-
+    
     if len(value) % m != 0:
         value += "X" * (m - len(value) % m)
     possible_permutations = list(itertools.permutations([x for x in range(0,m)]))
@@ -75,7 +74,7 @@ def decrypt_permutation(value:str, m:str) -> str:
         inv_perm = " ".join([str(x) for x in perm])
         values.append((new_value, f"inverse perm = {inv_perm}"))
         new_value = ''
-
+    
     mejor_palabra = get_most_english_string_ngram([x[0] for x in values])
     return values, mejor_palabra
 
@@ -100,7 +99,7 @@ def decrypt_multiplicative(value: str) -> str:
 
     if not possible_values:
         return [], None
-
+    
     # Find the most likely English string
     mejor_palabra = get_most_english_string_letter_freq([x[0] for x in possible_values])
     return possible_values, mejor_palabra
@@ -125,7 +124,7 @@ def ngram_score(string, model, n=3):
         if ngram in model:
             score += math.log(model[ngram])
         else:
-            score += math.log(1e-10)
+            score += math.log(1e-10) 
     return score
 
 def get_most_english_string_ngram(strings):
@@ -149,15 +148,12 @@ def letter_score(string):
     return score
 
 def get_most_english_string_letter_freq(strings):
-    return min(strings, key=coincidence_index)
+    return max(strings, key=letter_score)
 
-def coincidence_index(text):
-    for i in range(1, 26):
-        index = 0
-        for j in range(26):
-            index += text.count(chr(65 + j)) * (text.count(chr(65 + j)) - 1)
-        index /= len(text) * (len(text) - 1)
-    return abs(index - 0.067)
+
+#####################################
+#####       ONLY FOR DEBUG      #####
+#####################################
     
 def main(json_str):
     data = json.loads(json_str)
