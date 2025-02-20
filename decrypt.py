@@ -149,9 +149,16 @@ def letter_score(string):
     return score
 
 def get_most_english_string_letter_freq(strings):
-    return max(strings, key=letter_score)
+    return min(strings, key=coincidence_index)
 
-
+def coincidence_index(text):
+    for i in range(1, 26):
+        index = 0
+        for j in range(26):
+            index += text.count(chr(65 + j)) * (text.count(chr(65 + j)) - 1)
+        index /= len(text) * (len(text) - 1)
+    return abs(index - 0.067)
+    
 def main(json_str):
     data = json.loads(json_str)
 
