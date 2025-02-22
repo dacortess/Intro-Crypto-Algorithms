@@ -126,6 +126,32 @@ def encrypt_hill(text: str, key: str) -> str:
 
     return new_text, None, None
 
+def encrypt_vigenere(text: str, key: str) -> str:
+    text = text.upper()
+    key = key.upper()
+    new_text = ''
+    extended_key = ''
+    for i in range(len(text)):
+        if text[i] == ' ':
+            continue
+        extended_key += key[i % len(key)]
+
+    key_pos = 0
+    
+    for char in text:
+        n_char = ord(char)
+        if n_char == 32:  # Skip spaces
+            continue
+            
+        shift = ord(extended_key[key_pos]) - 65
+    
+        new_char = chr(((n_char - 65 + shift) % 26) + 65)
+        new_text += new_char
+        
+        key_pos += 1
+        
+    return new_text, None, None
+
 
 def main2(method: str, text: str, params: dict) -> str:
     if method == 'caesar':
@@ -140,6 +166,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1, p2 = encrypt_permutation(text, params['m'], params['pi'])
     elif method == 'hill':
         new_text, p1, p2 = encrypt_hill(text, params['key'])
+    elif method == 'vigenere':
+        new_text, p1, p2 = encrypt_vigenere(text, params['key'])
 
 
     return new_text, p1, p2
@@ -164,6 +192,8 @@ def main(json_str: str) -> str:
         new_text, p1, p2 = encrypt_permutation(text, params['m'], params['pi'])
     elif method == 'hill':
         new_text, p1, p2 = encrypt_hill(text, params['key'])
+    elif method == 'vigenere':
+        new_text, p1, p2 = encrypt_vigenere(text, params['key'])
 
 
     return new_text, p1, p2
@@ -190,6 +220,9 @@ if __name__ == "__main__":
         pi = input("pi: ")
         print(main2(method, text, {'m': m, 'pi': pi}))
     elif method == 'hill':
+        key = input("Key: ")
+        print(main2(method, text, {'key': key}))
+    elif method == 'vigenere':
         key = input("Key: ")
         print(main2(method, text, {'key': key}))
     #print(main(sys.argv[1]))

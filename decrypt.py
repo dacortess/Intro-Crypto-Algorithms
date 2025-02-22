@@ -167,6 +167,31 @@ def decrypt_hill(value: str, key: str) -> str:
     
     return new_value, new_value
     
+def decrypt_vigenere(value: str, key: str) -> str:
+    value = value.upper()
+    key = key.upper()
+    new_value = ''
+    extended_key = ''
+    for i in range(len(value)):
+        if value[i] == ' ':
+            continue
+        extended_key += key[i % len(key)]
+
+    key_pos = 0
+    
+    for char in value:
+        n_char = ord(char)
+        if n_char == 32:  # Skip spaces
+            continue
+            
+        shift = ord(extended_key[key_pos]) - 65
+    
+        new_char = chr(((n_char - 65 - shift) % 26) + 65)
+        new_value += new_char
+        
+        key_pos += 1
+        
+    return new_value, new_value
 
 def train_ngram_model(corpus, n=3):
     model = Counter()
@@ -232,6 +257,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1 = decrypt_permutation(text, int(params['m']))
     elif method == 'hill':
         new_text, p1 = decrypt_hill(text, params['key'])
+    elif method == 'vigenere':
+        new_text, p1 = decrypt_vigenere(text, params['key'])
     
     return new_text, p1
 
@@ -254,6 +281,10 @@ def main(json_str):
         result, best = decrypt_RSA(text, int(params['n']), int(params['pk']))
     elif method == 'permutation':
         result, best = decrypt_permutation(text, int(params['m']))
+    elif method == 'hill':
+        result, best = decrypt_hill(text, params['key'])
+    elif method == 'vigenere':
+        result, best = decrypt_vigenere(text, params['key'])
 
     return result, best
 
@@ -274,6 +305,9 @@ if __name__ == "__main__":
         m = int(input("m: "))
         print(main2(method, text, {'m': m}))
     elif method == 'hill':
+        key = input("key: ")
+        print(main2(method, text, {'key': key}))
+    elif method == 'vigenere':
         key = input("key: ")
         print(main2(method, text, {'key': key}))
     else:
