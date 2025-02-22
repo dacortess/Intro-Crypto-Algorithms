@@ -5,7 +5,9 @@ import nltk
 from nltk.corpus import words
 from collections import Counter
 import math
+import numpy as np #n
 nltk.download('words')
+
 def decrypt_caesar(value: str) -> str:
     value = value.upper()
     possible_values = list()
@@ -55,7 +57,7 @@ def decrypt_RSA(value: str, n:int, b:str) ->str:
         char = int(char)
         if char == 32: continue
         new_value += chr(((char - 65)**b % n) + 65)
-    return new_value
+    return new_value, new_value
 
 def decrypt_permutation(value:str, m:str) -> str:
     #List all the inverse permutations
@@ -103,6 +105,68 @@ def decrypt_multiplicative(value: str) -> str:
     # Find the most likely English string
     mejor_palabra = get_most_english_string_letter_freq([x[0] for x in possible_values])
     return possible_values, mejor_palabra
+
+def modular_multiplicative_inverse(a, m):
+    """Helper function to find modular multiplicative inverse"""
+    def extended_gcd(a, b):
+        if a == 0:
+            return b, 0, 1
+        gcd, x1, y1 = extended_gcd(b % a, a)
+        x = y1 - (b // a) * x1
+        y = x1
+        return gcd, x, y
+
+    _, x, _ = extended_gcd(a, m)
+    return (x % m + m) % m
+
+def matrix_modulo_inverse(matrix, modulus):
+    """Calculate the inverse of a matrix in modulo 26"""
+    # Convert to integer matrix
+    matrix = matrix.astype(int)
+    
+    # Calculate determinant and its modular multiplicative inverse
+    det = int(round(np.linalg.det(matrix))) % modulus
+    det_inv = modular_multiplicative_inverse(det, modulus)
+    
+    # Calculate adjugate matrix
+    adj = np.round(np.linalg.det(matrix) * np.linalg.inv(matrix)).astype(int)
+    
+    # Calculate inverse modulo 26
+    inv_matrix = (det_inv * adj) % modulus
+    return inv_matrix
+
+def decrypt_hill(value: str, key: str) -> str:
+    # Convert key string to numpy matrix
+    matrix = np.matrix(key)
+    m = matrix.shape[0]  # Get matrix size (m x m)
+    
+    # Validate key matrix
+    if matrix.shape[0] != matrix.shape[1] or np.linalg.det(matrix) % 2 == 0 or np.linalg.det(matrix) % 13 == 0:
+        return "Invalid key", None
+    
+    # Calculate inverse matrix modulo 26
+    try:
+        inv_matrix = matrix_modulo_inverse(matrix, 26)
+    except:
+        return "Matrix is not invertible modulo 26", None
+    
+    value = value.upper()
+    new_value = ''
+    
+    # Process text in blocks of size m
+    for i in range(0, len(value), m):
+        block = np.zeros(m, dtype=int)
+        for j in range(m):
+            if i + j < len(value):
+                block[j] = ord(value[i + j]) - 65
+        
+        result = np.dot(inv_matrix, block) % 26
+        
+        for num in result.flat:
+            new_value += chr(int(num) + 65)
+    
+    return new_value, new_value
+    
 
 def train_ngram_model(corpus, n=3):
     model = Counter()
@@ -154,7 +218,23 @@ def get_most_english_string_letter_freq(strings):
 #####################################
 #####       ONLY FOR DEBUG      #####
 #####################################
+
+def main2(method: str, text: str, params: dict) -> str:
+    if method == 'caesar':
+        new_text, p1 = decrypt_caesar(text)
+    elif method == 'affine':
+        new_text, p1 = decrypt_afin(text)
+    elif method == 'multiplicative':
+        new_text, p1 = decrypt_multiplicative(text)
+    elif method == 'rsa':
+        new_text, p1 = decrypt_RSA(text, int(params['n']), int(params['pk']))
+    elif method == 'permutation':
+        new_text, p1 = decrypt_permutation(text, int(params['m']))
+    elif method == 'hill':
+        new_text, p1 = decrypt_hill(text, params['key'])
     
+    return new_text, p1
+
 def main(json_str):
     data = json.loads(json_str)
 
@@ -178,4 +258,25 @@ def main(json_str):
     return result, best
 
 if __name__ == "__main__":
-    main()
+    method = input("Method: ")
+    text = input("Text: ")
+    if method == 'rsa':
+        n = int(input("n: "))
+        pk = int(input("pk: "))
+        print(main2(method, text, {'n': n, 'pk': pk}))
+    elif method == 'caesar':
+        print(main2(method, text, {}))
+    elif method == 'affine':
+        print(main2(method, text, {}))
+    elif method == 'multiplicative':
+        print(main2(method, text, {}))
+    elif method == 'permutation':
+        m = int(input("m: "))
+        print(main2(method, text, {'m': m}))
+    elif method == 'hill':
+        key = input("key: ")
+        print(main2(method, text, {'key': key}))
+    else:
+        print("Invalid method")
+        sys.exit(1)
+    #main()
