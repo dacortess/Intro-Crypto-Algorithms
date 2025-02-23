@@ -6,6 +6,10 @@ from nltk.corpus import words
 from collections import Counter
 import math
 import numpy as np #n
+from Crypto.Cipher import AES #n
+from Crypto.Util.Padding import unpad #n
+import base64 #n
+
 nltk.download('words')
 
 def decrypt_caesar(value: str) -> str:
@@ -193,6 +197,45 @@ def decrypt_vigenere(value: str, key: str) -> str:
         
     return new_value, new_value
 
+def decrypt_AES(encrypted_str: str, key_str: str, iv:str,  mode: str) -> str:
+    """
+    Decrypts AES encrypted text from a base64 string.
+    
+    Args:
+        encrypted_str (str): Combined IV and ciphertext string from encrypt_AES
+        key_str (str): Base64 encoded key string
+        mode (str): AES mode used for encryption
+    """
+        
+    # Decode the components
+    iv = base64.b64decode(iv)
+    ciphertext = base64.b64decode(encrypted_str)
+    key = key.encode('utf-8')
+    if len(key) < 16:
+        key = key.ljust(16, b'\0')
+    elif len(key) < 24:
+        key = key[:16]
+    elif len(key) < 32:
+        key = key[:24]
+    else:
+        key = key[:32]
+        
+    # Create cipher object based on mode
+    if mode == 'CBC':
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+    elif mode == 'CFB':
+        cipher = AES.new(key, AES.MODE_CFB, iv)
+    elif mode == 'OFB':
+        cipher = AES.new(key, AES.MODE_OFB, iv)
+    elif mode == 'CTR':
+        cipher = AES.new(key, AES.MODE_CTR, nonce=iv[:8])
+    elif mode == 'ECB':
+        cipher = AES.new(key, AES.MODE_ECB)
+            
+    # Decrypt and unpad
+    decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
+    return decrypted.decode('utf-8'), None
+
 def train_ngram_model(corpus, n=3):
     model = Counter()
     for word in corpus:
@@ -259,6 +302,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1 = decrypt_hill(text, params['key'])
     elif method == 'vigenere':
         new_text, p1 = decrypt_vigenere(text, params['key'])
+    elif method == 'aes':
+        new_text, p1 = decrypt_AES(text, params['key'], params['iv'], params['mode'])
     
     return new_text, p1
 
@@ -285,6 +330,8 @@ def main(json_str):
         result, best = decrypt_hill(text, params['key'])
     elif method == 'vigenere':
         result, best = decrypt_vigenere(text, params['key'])
+    elif method == 'aes':
+        result, best = decrypt_AES(text, params['key'], params['iv'], params['mode'])
 
     return result, best
 
@@ -310,6 +357,11 @@ if __name__ == "__main__":
     elif method == 'vigenere':
         key = input("key: ")
         print(main2(method, text, {'key': key}))
+    elif method == 'aes':
+        key = input("key: ")
+        iv = input("iv: ")
+        mode = input("mode: ")
+        print(main2(method, text, {'key': key, 'iv': iv, 'mode': mode}))
     else:
         print("Invalid method")
         sys.exit(1)

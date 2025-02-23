@@ -3,6 +3,10 @@ from random import randint
 from math import gcd
 import sys #n
 import numpy as np #n
+from Crypto.Cipher import AES #n
+from Crypto.Util.Padding import pad #n
+from Crypto.Random import get_random_bytes #n
+import base64 #n
 
 def encrypt_caesar(text: str, a: int) -> str:
 
@@ -152,7 +156,61 @@ def encrypt_vigenere(text: str, key: str) -> str:
         
     return new_text, None, None
 
+def encrypt_AES(text: str, key: str, mode: str) -> str:
+    """
+    Encrypts text using AES and returns a base64 string containing the ciphertext and IV.
+    
+    Args:
+        text (str): Text to encrypt
+        key (str): Encryption key (will be padded/truncated to 16, 24, or 32 bytes)
+        mode (str): AES mode ('CBC', 'CFB', 'OFB', 'CTR', 'ECB')
+    
+    Returns:
+        tuple: (encrypted_string, key_string, None)
+        encrypted_string format: "base64_encoded_iv:base64_encoded_ciphertext"
+    """
+    # Prepare the key
+    key = key.encode('utf-8')
+    if len(key) < 16:
+        key = key.ljust(16, b'\0')
+    elif len(key) < 24:
+        key = key[:16]
+    elif len(key) < 32:
+        key = key[:24]
+    else:
+        key = key[:32]
 
+    # Convert text to bytes
+    text = text.encode('utf-8')
+    
+    # Generate IV
+    iv = get_random_bytes(16)
+    
+    # Create cipher object based on mode
+    if mode == 'CBC':
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+    elif mode == 'CFB':
+        cipher = AES.new(key, AES.MODE_CFB, iv)
+    elif mode == 'OFB':
+        cipher = AES.new(key, AES.MODE_OFB, iv)
+    elif mode == 'CTR':
+        cipher = AES.new(key, AES.MODE_CTR, nonce=iv[:8])
+    elif mode == 'ECB':
+        cipher = AES.new(key, AES.MODE_ECB)
+        iv = b''  # No IV for ECB
+    else:
+        raise ValueError("Invalid mode. Use 'CBC', 'CFB', 'OFB', 'CTR', or 'ECB'")
+
+    # Encrypt and pad the text
+    ciphertext = cipher.encrypt(pad(text, AES.block_size))
+    
+    # Combine IV and ciphertext and encode to base64
+    iv_b64 = base64.b64encode(iv).decode('utf-8')
+    ciphertext_b64 = base64.b64encode(ciphertext).decode('utf-8')
+    
+    # Return the combined string and encoded key
+    return ciphertext_b64, key, iv_b64
+    
 def main2(method: str, text: str, params: dict) -> str:
     if method == 'caesar':
         new_text, p1, p2 = encrypt_caesar(text, int(params['a']))
@@ -168,6 +226,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1, p2 = encrypt_hill(text, params['key'])
     elif method == 'vigenere':
         new_text, p1, p2 = encrypt_vigenere(text, params['key'])
+    elif method == 'aes':
+        new_text, p1, p2 = encrypt_AES(text, params['key'], params['mode'])
 
 
     return new_text, p1, p2
@@ -194,6 +254,8 @@ def main(json_str: str) -> str:
         new_text, p1, p2 = encrypt_hill(text, params['key'])
     elif method == 'vigenere':
         new_text, p1, p2 = encrypt_vigenere(text, params['key'])
+    elif method == 'aes':
+        new_text, p1, p2 = encrypt_AES(text, params['key'], params['mode'])
 
 
     return new_text, p1, p2
@@ -225,4 +287,8 @@ if __name__ == "__main__":
     elif method == 'vigenere':
         key = input("Key: ")
         print(main2(method, text, {'key': key}))
+    elif method == 'aes':
+        key = input("Key: ")
+        mode = input("Mode: ")
+        print(main2(method, text, {'key': key, 'mode': mode}))
     #print(main(sys.argv[1]))
