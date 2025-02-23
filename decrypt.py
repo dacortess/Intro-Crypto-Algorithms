@@ -197,7 +197,7 @@ def decrypt_vigenere(value: str, key: str) -> str:
         
     return new_value, new_value
 
-def decrypt_AES(encrypted_str: str, key_str: str, iv:str,  mode: str) -> str:
+def decrypt_AES(encrypted_str: str, key: str, iv:str,  mode: str) -> str:
     """
     Decrypts AES encrypted text from a base64 string.
     

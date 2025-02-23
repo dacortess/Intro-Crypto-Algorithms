@@ -170,6 +170,7 @@ def encrypt_AES(text: str, key: str, mode: str) -> str:
         encrypted_string format: "base64_encoded_iv:base64_encoded_ciphertext"
     """
     # Prepare the key
+    key1 = key
     key = key.encode('utf-8')
     if len(key) < 16:
         key = key.ljust(16, b'\0')
@@ -209,7 +210,7 @@ def encrypt_AES(text: str, key: str, mode: str) -> str:
     ciphertext_b64 = base64.b64encode(ciphertext).decode('utf-8')
     
     # Return the combined string and encoded key
-    return ciphertext_b64, key, iv_b64
+    return ciphertext_b64, key1, iv_b64
     
 def main2(method: str, text: str, params: dict) -> str:
     if method == 'caesar':
