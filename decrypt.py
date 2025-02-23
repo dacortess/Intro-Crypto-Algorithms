@@ -8,6 +8,7 @@ import math
 import numpy as np #n
 from Crypto.Cipher import AES #n
 from Crypto.Util.Padding import unpad #n
+from Crypto.Cipher import DES #n
 import base64 #n
 
 nltk.download('words')
@@ -236,6 +237,46 @@ def decrypt_AES(encrypted_str: str, key: str, iv:str,  mode: str) -> str:
     decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
     return decrypted.decode('utf-8'), None
 
+def decrypt_DES(encrypted_str: str, key: str, iv: str, mode: str) -> str:
+    """
+    Decrypts DES encrypted text from a base64 string.
+    
+    Args:
+        encrypted_str (str): Base64 encoded ciphertext
+        key (str): Encryption key
+        iv (str): Base64 encoded IV
+        mode (str): DES mode used for encryption
+    
+    Returns:
+        tuple: (decrypted_text, None)
+    """
+    # Decode the components
+    iv = base64.b64decode(iv)
+    ciphertext = base64.b64decode(encrypted_str)
+    
+    key = key.encode('utf-8')
+    if len(key) < 8:
+        key = key.ljust(8, b'\0')
+    else:
+        key = key[:8]
+    
+    # Create cipher object based on mode
+    if mode == 'CBC':
+        cipher = DES.new(key, DES.MODE_CBC, iv)
+    elif mode == 'CFB':
+        cipher = DES.new(key, DES.MODE_CFB, iv)
+    elif mode == 'OFB':
+        cipher = DES.new(key, DES.MODE_OFB, iv)
+    elif mode == 'CTR':
+        cipher = DES.new(key, DES.MODE_CTR, nonce=iv[:4])
+    elif mode == 'ECB':
+        cipher = DES.new(key, DES.MODE_ECB)
+    else:
+        raise ValueError("Invalid mode. Use 'CBC', 'CFB', 'OFB', 'CTR', or 'ECB'")
+    
+    decrypted = unpad(cipher.decrypt(ciphertext), DES.block_size)
+    return decrypted.decode('utf-8'), None
+
 def train_ngram_model(corpus, n=3):
     model = Counter()
     for word in corpus:
@@ -304,6 +345,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1 = decrypt_vigenere(text, params['key'])
     elif method == 'aes':
         new_text, p1 = decrypt_AES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'des':
+        new_text, p1 = decrypt_DES(text, params['key'], params['iv'], params['mode'])
     
     return new_text, p1
 
@@ -332,6 +375,8 @@ def main(json_str):
         result, best = decrypt_vigenere(text, params['key'])
     elif method == 'aes':
         result, best = decrypt_AES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'des':
+        result, best = decrypt_DES(text, params['key'], params['iv'], params['mode'])
 
     return result, best
 
@@ -358,8 +403,13 @@ if __name__ == "__main__":
         key = input("key: ")
         print(main2(method, text, {'key': key}))
     elif method == 'aes':
-        key = input("key: ")
-        iv = input("iv: ")
+        key = input("key (english): ")
+        iv = input("iv(ciphered): ")
+        mode = input("mode: ")
+        print(main2(method, text, {'key': key, 'iv': iv, 'mode': mode}))
+    elif method == 'des':
+        key = input("key (english): ")
+        iv = input("iv(ciphered): ")
         mode = input("mode: ")
         print(main2(method, text, {'key': key, 'iv': iv, 'mode': mode}))
     else:

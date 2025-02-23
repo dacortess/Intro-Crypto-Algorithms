@@ -6,6 +6,7 @@ import numpy as np #n
 from Crypto.Cipher import AES #n
 from Crypto.Util.Padding import pad #n
 from Crypto.Random import get_random_bytes #n
+from Crypto.Cipher import DES #n
 import base64 #n
 
 def encrypt_caesar(text: str, a: int) -> str:
@@ -211,6 +212,53 @@ def encrypt_AES(text: str, key: str, mode: str) -> str:
     
     # Return the combined string and encoded key
     return ciphertext_b64, key1, iv_b64
+
+def encrypt_DES(text: str, key: str, mode: str) -> str:
+    """
+    Encrypts text using DES and returns a base64 string containing the ciphertext and IV.
+    
+    Args:
+        text (str): Text to encrypt
+        key (str): Encryption key (will be padded/truncated to 8 bytes)
+        mode (str): DES mode ('CBC', 'CFB', 'OFB', 'CTR', 'ECB')
+    
+    Returns:
+        tuple: (encrypted_string, key_string, iv_string)
+        encrypted_string format: base64 encoded ciphertext
+    """
+    # Ajustarlo a 8 bytes
+    key1 = key
+    key = key.encode('utf-8')
+    if len(key) < 8:
+        key = key.ljust(8, b'\0')
+    else:
+        key = key[:8]
+
+    text = text.encode('utf-8')
+    
+    iv = get_random_bytes(8)
+    
+    if mode == 'CBC':
+        cipher = DES.new(key, DES.MODE_CBC, iv)
+    elif mode == 'CFB':
+        cipher = DES.new(key, DES.MODE_CFB, iv)
+    elif mode == 'OFB':
+        cipher = DES.new(key, DES.MODE_OFB, iv)
+    elif mode == 'CTR':
+        cipher = DES.new(key, DES.MODE_CTR, nonce=iv[:4])
+    elif mode == 'ECB':
+        cipher = DES.new(key, DES.MODE_ECB)
+        iv = b''  # No IV for ECB
+    else:
+        raise ValueError("Invalid mode. Use 'CBC', 'CFB', 'OFB', 'CTR', or 'ECB'")
+
+    ciphertext = cipher.encrypt(pad(text, DES.block_size))
+    
+    # Encode to base64
+    iv_b64 = base64.b64encode(iv).decode('utf-8')
+    ciphertext_b64 = base64.b64encode(ciphertext).decode('utf-8')
+    
+    return ciphertext_b64, key1, iv_b64
     
 def main2(method: str, text: str, params: dict) -> str:
     if method == 'caesar':
@@ -229,6 +277,9 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1, p2 = encrypt_vigenere(text, params['key'])
     elif method == 'aes':
         new_text, p1, p2 = encrypt_AES(text, params['key'], params['mode'])
+    elif method == 'des':
+        new_text, p1, p2 = encrypt_DES(text, params['key'], params['mode'])
+        
 
 
     return new_text, p1, p2
@@ -257,6 +308,9 @@ def main(json_str: str) -> str:
         new_text, p1, p2 = encrypt_vigenere(text, params['key'])
     elif method == 'aes':
         new_text, p1, p2 = encrypt_AES(text, params['key'], params['mode'])
+    elif method == 'des':
+        new_text, p1, p2 = encrypt_DES(text, params['key'], params['mode'])
+        
 
 
     return new_text, p1, p2
@@ -289,6 +343,10 @@ if __name__ == "__main__":
         key = input("Key: ")
         print(main2(method, text, {'key': key}))
     elif method == 'aes':
+        key = input("Key: ")
+        mode = input("Mode: ")
+        print(main2(method, text, {'key': key, 'mode': mode}))
+    elif method == 'des':
         key = input("Key: ")
         mode = input("Mode: ")
         print(main2(method, text, {'key': key, 'mode': mode}))
