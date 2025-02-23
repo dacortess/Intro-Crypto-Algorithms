@@ -10,6 +10,7 @@ from Crypto.Cipher import DES #n
 from Crypto.PublicKey import DSA
 from Crypto.Signature import DSS
 from Crypto.Hash import SHA256
+from Crypto.Util.number import getPrime, getRandomRange #n
 import base64 #n
 
 def encrypt_caesar(text: str, a: int) -> str:
@@ -293,6 +294,86 @@ def encrypt_DSA(text: str, key_size: int = 2048) -> str:
         return signature_b64, public_key, private_key
     except Exception as e:
         return f"Error in DSA encryption: {str(e)}", None, None
+    
+def generate_elgamal_params(key_size=1024):
+    """
+    Generate El Gamal parameters (p, g) and keys
+    """
+    # Generate a prime p
+    p = getPrime(key_size)
+    
+    # Choose generator g
+    g = 2
+    while True:
+        g = getRandomRange(2, p-1)
+        if pow(g, (p-1)//2, p) != 1:
+            break
+    
+    # Generate private key x
+    x = getRandomRange(2, p-2)
+    
+    # Calculate public key y = g^x mod p
+    y = pow(g, x, p)
+    
+    return p, g, x, y
+
+def encrypt_ElGamal(text: str, key_size: int = 1024) -> str:
+    """
+    Encrypts text using El Gamal encryption.
+    
+    Args:
+        text (str): Text to encrypt
+        key_size (int): Size of the prime in bits
+    
+    Returns:
+        tuple: (encrypted_data, public_key_data, private_key_data)
+    """
+    try:
+        # Generate parameters and keys
+        p, g, x, y = generate_elgamal_params(key_size)
+        
+        # Convert text to number (each character to 3 digits)
+        M = 0
+        for char in text:
+            M = M * 1000 + ord(char)
+        
+        # Generate ephemeral key k
+        k = getRandomRange(2, p-2)
+        
+        # Calculate c1 = g^k mod p
+        c1 = pow(g, k, p)
+        
+        # Calculate c2 = M * y^k mod p
+        c2 = (M * pow(y, k, p)) % p
+        
+        # Create encrypted message object
+        encrypted_data = {
+            "c1": str(c1),
+            "c2": str(c2)
+        }
+        
+        # Create public key object
+        public_key = {
+            "p": str(p),
+            "g": str(g),
+            "y": str(y)
+        }
+        
+        # Create private key object
+        private_key = {
+            "p": str(p),
+            "x": str(x)
+        }
+        
+        # Convert to base64
+        encrypted_b64 = base64.b64encode(json.dumps(encrypted_data).encode()).decode()
+        public_key_b64 = base64.b64encode(json.dumps(public_key).encode()).decode()
+        private_key_b64 = base64.b64encode(json.dumps(private_key).encode()).decode()
+        
+        return encrypted_b64, public_key_b64, private_key_b64
+        
+    except Exception as e:
+        return f"Error in El Gamal encryption: {str(e)}", None, None
 
 def main2(method: str, text: str, params: dict) -> str:
     if method == 'caesar':
@@ -315,6 +396,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1, p2 = encrypt_DES(text, params['key'], params['mode'])
     elif method == 'dsa':
         new_text, p1, p2 = encrypt_DSA(text, int(params['key_size']))
+    elif method == 'elgamal':
+        new_text, p1, p2 = encrypt_ElGamal(text, int(params['key_size']))
         
 
 
@@ -348,7 +431,8 @@ def main(json_str: str) -> str:
         new_text, p1, p2 = encrypt_DES(text, params['key'], params['mode'])
     elif method == 'dsa':
         new_text, p1, p2 = encrypt_DSA(text, int(params['key_size']))
-        
+    elif method == 'elgamal':
+        new_text, p1, p2 = encrypt_ElGamal(text, int(params['key_size']))
 
 
     return new_text, p1, p2
@@ -391,4 +475,7 @@ if __name__ == "__main__":
     elif method == 'dsa':
         key_size = int(input("Key size: "))
         print(main2(method, text, {'key_size(1024 or 2048 recommended)': key_size}))
+    elif method == 'elgamal':
+        key_size = int(input("Key size(1024 or 2048 recommended): "))
+        print(main2(method, text, {'key_size': key_size}))
     #print(main(sys.argv[1]))

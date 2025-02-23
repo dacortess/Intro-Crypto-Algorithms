@@ -9,9 +9,9 @@ import numpy as np #n
 from Crypto.Cipher import AES #n
 from Crypto.Util.Padding import unpad #n
 from Crypto.Cipher import DES #n
-from Crypto.PublicKey import DSA
-from Crypto.Signature import DSS
-from Crypto.Hash import SHA256
+from Crypto.PublicKey import DSA #n
+from Crypto.Signature import DSS #n
+from Crypto.Hash import SHA256 #n
 import base64 #n
 
 nltk.download('words')
@@ -314,6 +314,49 @@ def decrypt_DSA(signature: str, message: str, public_key: str) -> str:
     except Exception as e:
         return f"Error in DSA verification: {str(e)}", None
 
+def decrypt_ElGamal(encrypted_b64: str, private_key_b64: str) -> str:
+    """
+    Decrypts El Gamal encrypted text.
+    
+    Args:
+        encrypted_b64 (str): Base64 encoded encrypted data
+        private_key_b64 (str): Base64 encoded private key
+    
+    Returns:
+        tuple: (decrypted_text, None)
+    """
+    try:
+        # Decode from base64 and parse JSON
+        encrypted_data = json.loads(base64.b64decode(encrypted_b64).decode())
+        private_key = json.loads(base64.b64decode(private_key_b64).decode())
+        
+        # Extract values
+        c1 = int(encrypted_data["c1"])
+        c2 = int(encrypted_data["c2"])
+        p = int(private_key["p"])
+        x = int(private_key["x"])
+        
+        # Calculate s = c1^x mod p
+        s = pow(c1, x, p)
+        
+        # Calculate s_inverse = s^(p-2) mod p
+        s_inverse = pow(s, p-2, p)
+        
+        # Recover M = c2 * s_inverse mod p
+        M = (c2 * s_inverse) % p
+        
+        # Convert number back to text
+        decrypted_text = ""
+        while M > 0:
+            char_code = M % 1000
+            decrypted_text = chr(char_code) + decrypted_text
+            M //= 1000
+            
+        return decrypted_text, None
+        
+    except Exception as e:
+        return f"Error in El Gamal decryption: {str(e)}", None
+
 def train_ngram_model(corpus, n=3):
     model = Counter()
     for word in corpus:
@@ -386,6 +429,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1 = decrypt_DES(text, params['key'], params['iv'], params['mode'])
     elif method == 'dsa':
         new_text, p1 = decrypt_DSA(text, params['message'], params['pk'])
+    elif method == 'elgamal':
+        new_text, p1 = decrypt_ElGamal(text, params['pk'])
     
     return new_text, p1
 
@@ -418,6 +463,8 @@ def main(json_str):
         result, best = decrypt_DES(text, params['key'], params['iv'], params['mode'])
     elif method == 'dsa':
         result, best = decrypt_DSA(text, params['message'], params['pk'])
+    elif method == 'elgamal':
+        result, best = decrypt_ElGamal(text, params['pk'])
 
     return result, best
 
@@ -457,6 +504,9 @@ if __name__ == "__main__":
         pk = input("public key: ")
         message = input("original text: ")
         print(main2(method, text, {'pk': pk, 'message': message}))
+    elif method == 'elgamal':
+        pk = input("private key: ")
+        print(main2(method, text, {'pk': pk}))
     else:
         print("Invalid method")
         sys.exit(1)
