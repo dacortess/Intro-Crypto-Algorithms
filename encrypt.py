@@ -9,9 +9,13 @@ from Crypto.Random import get_random_bytes #n
 from Crypto.Cipher import DES #n
 from Crypto.PublicKey import DSA
 from Crypto.Signature import DSS
-from Crypto.Hash import SHA256
+from Crypto.Hash import SHA256, HMAC
 from Crypto.Util.number import getPrime, getRandomRange #n
+from Crypto.Util import Counter #n
 import base64 #n
+import io #n
+import os #n
+from PIL import Image #n
 
 def encrypt_caesar(text: str, a: int) -> str:
 
@@ -375,6 +379,62 @@ def encrypt_ElGamal(text: str, key_size: int = 1024) -> str:
     except Exception as e:
         return f"Error in El Gamal encryption: {str(e)}", None, None
 
+def encrypt_image(input_image_path, output_image_path, key):
+    # Load the image
+    image = Image.open(input_image_path)
+    
+    key = key.encode('utf-8')
+    if len(key) < 16:
+        key = key.ljust(16, b'\0')
+    elif len(key) < 24:
+        key = key[:16]
+    elif len(key) < 32:
+        key = key[:24]
+    else:
+        key = key[:32]
+    
+    iv = get_random_bytes(16)
+    
+    
+    image_hash = SHA256.new(os.path.basename(input_image_path).encode("utf-8")).hexdigest()
+    # Combine key-specific value with random string (nonce) using HMAC
+    key_specific = HMAC.new(key, msg=image_hash.encode("utf-8"), digestmod=SHA256).digest()
+    unique_iv = HMAC.new(key_specific, msg=os.urandom(16), digestmod=SHA256).digest()[:16]
+    
+    if len(unique_iv) != 16:
+        raise ValueError("Unexpected IV length. Encryption aborted.")
+    
+    # Convert the image to bytes
+    img_byte_array = io.BytesIO()
+    image.save(img_byte_array, format=image.format)
+    img_bytes = img_byte_array.getvalue()
+    # Initialize AES cipher
+    cipher = AES.new(key, AES.MODE_CBC, unique_iv)
+    # Encrypt the image data with padding
+    padded_data = pad(img_bytes, AES.block_size)
+    encrypted_data = iv + cipher.encrypt(padded_data)
+    #  Write the encrypted data to the output image file
+    with open(output_image_path, 'wb') as f:
+        f.write(encrypted_data)
+    # Save the IV to a separate file with a filename related to the image
+    iv_path = os.path.join(os.path.dirname(output_image_path), f"{os.path.basename(input_image_path)}.iv")
+    with open(iv_path, 'wb') as f:
+        f.write(unique_iv)
+    print(f"Encryption successful. Encrypted image saved to '{output_image_path}'.")
+    print(f"IV file saved to '{iv_path}'.")
+    return None, None, None
+
+def view_encrypted_image(image_path):
+    try:
+        # Open the image file
+        with Image.open(image_path) as img:
+            # Display the image
+            img.show()
+    except Exception as e:
+        print(f"Error opening image: {e}")
+
+
+
 def main2(method: str, text: str, params: dict) -> str:
     if method == 'caesar':
         new_text, p1, p2 = encrypt_caesar(text, int(params['a']))
@@ -398,6 +458,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1, p2 = encrypt_DSA(text, int(params['key_size']))
     elif method == 'elgamal':
         new_text, p1, p2 = encrypt_ElGamal(text, int(params['key_size']))
+    elif method == "image":
+        new_text, p1, p2 = encrypt_image(params['input_image_path'], params['output_image_path'], params['key'])
         
 
 
@@ -433,6 +495,9 @@ def main(json_str: str) -> str:
         new_text, p1, p2 = encrypt_DSA(text, int(params['key_size']))
     elif method == 'elgamal':
         new_text, p1, p2 = encrypt_ElGamal(text, int(params['key_size']))
+    elif method == "image":
+        new_text, p1, p2 = encrypt_image(params['input_image_path'], params['output_image_path'], params['key'])
+        view_encrypted_image(params['output_image_path'])
 
 
     return new_text, p1, p2
@@ -478,4 +543,9 @@ if __name__ == "__main__":
     elif method == 'elgamal':
         key_size = int(input("Key size(1024 or 2048 recommended): "))
         print(main2(method, text, {'key_size': key_size}))
+    elif method == 'image':
+        input_image_path = "image.jpg"
+        output_image_path = "out.jpg"
+        key = input("Key: ")
+        print(main2(method, text, {'input_image_path': input_image_path, 'output_image_path': output_image_path, 'key': key}))
     #print(main(sys.argv[1]))

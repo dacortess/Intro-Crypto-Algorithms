@@ -2,6 +2,8 @@ import sys
 import json
 import itertools
 import nltk
+import os
+import io
 from nltk.corpus import words
 from collections import Counter
 import math
@@ -11,7 +13,9 @@ from Crypto.Util.Padding import unpad #n
 from Crypto.Cipher import DES #n
 from Crypto.PublicKey import DSA #n
 from Crypto.Signature import DSS #n
-from Crypto.Hash import SHA256 #n
+from Crypto.Hash import SHA256, HMAC, SHA1 #n
+from Crypto.Util import Counter as Ctr #n
+from PIL import Image #n
 import base64 #n
 
 nltk.download('words')
@@ -357,6 +361,36 @@ def decrypt_ElGamal(encrypted_b64: str, private_key_b64: str) -> str:
     except Exception as e:
         return f"Error in El Gamal decryption: {str(e)}", None
 
+def decrypt_image(input_image_path, output_image_path, key, iv_path):
+  # Read the IV from the separate file
+    key = key.encode('utf-8')
+    if len(key) < 16:
+        key = key.ljust(16, b'\0')
+    elif len(key) < 24:
+        key = key[:16]
+    elif len(key) < 32:
+        key = key[:24]
+    else:
+        key = key[:32]
+    with open(iv_path, 'rb') as f:
+        unique_iv = f.read()
+    # Read the encrypted data
+    with open(input_image_path, 'rb') as f:
+        encrypted_data = f.read()
+    # Separate the IV from the encrypted data
+    iv = encrypted_data[:AES.block_size]
+    encrypted_data = encrypted_data[AES.block_size:]
+    # Initialize AES cipher
+    cipher = AES.new(key, AES.MODE_CBC, unique_iv)
+    # Decrypt the image data
+    decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+    # Convert decrypted bytes to image
+    decrypted_image = Image.open(io.BytesIO(decrypted_data))
+    # Save the decrypted image
+    decrypted_image.save(output_image_path, format=decrypted_image.format)
+    print(f"Decryption successful. Decrypted image saved to '{output_image_path}'.")
+    return None, None
+
 def train_ngram_model(corpus, n=3):
     model = Counter()
     for word in corpus:
@@ -431,6 +465,9 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1 = decrypt_DSA(text, params['message'], params['pk'])
     elif method == 'elgamal':
         new_text, p1 = decrypt_ElGamal(text, params['pk'])
+    elif method == 'image':
+        new_text, p1 = decrypt_image(params['input_image_path'], params['output_image_path'], params['key'], params['iv_path'])
+        
     
     return new_text, p1
 
@@ -465,6 +502,8 @@ def main(json_str):
         result, best = decrypt_DSA(text, params['message'], params['pk'])
     elif method == 'elgamal':
         result, best = decrypt_ElGamal(text, params['pk'])
+    elif method == 'image':
+        result, best = decrypt_image(params['input_image_path'], params['output_image_path'], params['key'], params['iv_path'])
 
     return result, best
 
@@ -507,6 +546,12 @@ if __name__ == "__main__":
     elif method == 'elgamal':
         pk = input("private key: ")
         print(main2(method, text, {'pk': pk}))
+    elif method == 'image':
+        input_image_path = "out.jpg"
+        output_image_path = "decrypted.jpg"
+        key = input("key: ")
+        iv_path = "image.jpg.iv"
+        print(main2(method, text, {'input_image_path': input_image_path, 'output_image_path': output_image_path, 'key': key, 'iv_path': iv_path}))
     else:
         print("Invalid method")
         sys.exit(1)
