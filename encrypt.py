@@ -7,6 +7,9 @@ from Crypto.Cipher import AES #n
 from Crypto.Util.Padding import pad #n
 from Crypto.Random import get_random_bytes #n
 from Crypto.Cipher import DES #n
+from Crypto.PublicKey import DSA
+from Crypto.Signature import DSS
+from Crypto.Hash import SHA256
 import base64 #n
 
 def encrypt_caesar(text: str, a: int) -> str:
@@ -259,7 +262,38 @@ def encrypt_DES(text: str, key: str, mode: str) -> str:
     ciphertext_b64 = base64.b64encode(ciphertext).decode('utf-8')
     
     return ciphertext_b64, key1, iv_b64
+
+def encrypt_DSA(text: str, key_size: int = 2048) -> str:
+    """
+    Generates DSA keys and signs a message.
     
+    Args:
+        text (str): Message to sign
+        key_size (int): Size of the key in bits (1024, 2048, or 3072)
+    
+    Returns:
+        tuple: (signature_string, public_key_string, private_key_string)
+    """
+    try:
+        # Generate new DSA key
+        key = DSA.generate(key_size)
+        
+        # Export keys in PEM format and encode to base64
+        private_key = base64.b64encode(key.export_key()).decode('utf-8')
+        public_key = base64.b64encode(key.publickey().export_key()).decode('utf-8')
+        
+        # Create the hash object and sign
+        hash_obj = SHA256.new(text.encode('utf-8'))
+        signer = DSS.new(key, 'fips-186-3')
+        signature = signer.sign(hash_obj)
+        
+        # Encode signature to base64
+        signature_b64 = base64.b64encode(signature).decode('utf-8')
+        
+        return signature_b64, public_key, private_key
+    except Exception as e:
+        return f"Error in DSA encryption: {str(e)}", None, None
+
 def main2(method: str, text: str, params: dict) -> str:
     if method == 'caesar':
         new_text, p1, p2 = encrypt_caesar(text, int(params['a']))
@@ -279,6 +313,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1, p2 = encrypt_AES(text, params['key'], params['mode'])
     elif method == 'des':
         new_text, p1, p2 = encrypt_DES(text, params['key'], params['mode'])
+    elif method == 'dsa':
+        new_text, p1, p2 = encrypt_DSA(text, int(params['key_size']))
         
 
 
@@ -310,6 +346,8 @@ def main(json_str: str) -> str:
         new_text, p1, p2 = encrypt_AES(text, params['key'], params['mode'])
     elif method == 'des':
         new_text, p1, p2 = encrypt_DES(text, params['key'], params['mode'])
+    elif method == 'dsa':
+        new_text, p1, p2 = encrypt_DSA(text, int(params['key_size']))
         
 
 
@@ -350,4 +388,7 @@ if __name__ == "__main__":
         key = input("Key: ")
         mode = input("Mode: ")
         print(main2(method, text, {'key': key, 'mode': mode}))
+    elif method == 'dsa':
+        key_size = int(input("Key size: "))
+        print(main2(method, text, {'key_size(1024 or 2048 recommended)': key_size}))
     #print(main(sys.argv[1]))

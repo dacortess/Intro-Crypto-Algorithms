@@ -9,6 +9,9 @@ import numpy as np #n
 from Crypto.Cipher import AES #n
 from Crypto.Util.Padding import unpad #n
 from Crypto.Cipher import DES #n
+from Crypto.PublicKey import DSA
+from Crypto.Signature import DSS
+from Crypto.Hash import SHA256
 import base64 #n
 
 nltk.download('words')
@@ -277,6 +280,40 @@ def decrypt_DES(encrypted_str: str, key: str, iv: str, mode: str) -> str:
     decrypted = unpad(cipher.decrypt(ciphertext), DES.block_size)
     return decrypted.decode('utf-8'), None
 
+def decrypt_DSA(signature: str, message: str, public_key: str) -> str:
+    """
+    Verifies a DSA signature.
+    
+    Args:
+        signature (str): Base64 encoded signature
+        message (str): Original message
+        public_key (str): Base64 encoded public key
+    
+    Returns:
+        tuple: (verification_result, None)
+    """
+    try:
+        # Decode the public key and signature from base64
+        public_key_pem = base64.b64decode(public_key)
+        signature = base64.b64decode(signature)
+        
+        # Import the public key
+        key = DSA.import_key(public_key_pem)
+        
+        # Create the hash object
+        hash_obj = SHA256.new(message.encode('utf-8'))
+        
+        # Verify the signature
+        verifier = DSS.new(key, 'fips-186-3')
+        try:
+            verifier.verify(hash_obj, signature)
+            return "Signature is valid", None
+        except ValueError:
+            return "Signature is invalid", None
+            
+    except Exception as e:
+        return f"Error in DSA verification: {str(e)}", None
+
 def train_ngram_model(corpus, n=3):
     model = Counter()
     for word in corpus:
@@ -347,6 +384,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1 = decrypt_AES(text, params['key'], params['iv'], params['mode'])
     elif method == 'des':
         new_text, p1 = decrypt_DES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'dsa':
+        new_text, p1 = decrypt_DSA(text, params['message'], params['pk'])
     
     return new_text, p1
 
@@ -377,6 +416,8 @@ def main(json_str):
         result, best = decrypt_AES(text, params['key'], params['iv'], params['mode'])
     elif method == 'des':
         result, best = decrypt_DES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'dsa':
+        result, best = decrypt_DSA(text, params['message'], params['pk'])
 
     return result, best
 
@@ -412,6 +453,10 @@ if __name__ == "__main__":
         iv = input("iv(ciphered): ")
         mode = input("mode: ")
         print(main2(method, text, {'key': key, 'iv': iv, 'mode': mode}))
+    elif method == 'dsa':
+        pk = input("public key: ")
+        message = input("original text: ")
+        print(main2(method, text, {'pk': pk, 'message': message}))
     else:
         print("Invalid method")
         sys.exit(1)
