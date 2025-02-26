@@ -2,10 +2,24 @@ import sys
 import json
 import itertools
 import nltk
+import os
+import io
 from nltk.corpus import words
 from collections import Counter
 import math
+import numpy as np #n
+from Crypto.Cipher import AES #n
+from Crypto.Util.Padding import unpad #n
+from Crypto.Cipher import DES #n
+from Crypto.PublicKey import DSA #n
+from Crypto.Signature import DSS #n
+from Crypto.Hash import SHA256, HMAC, SHA1 #n
+from Crypto.Util import Counter as Ctr #n
+from PIL import Image #n
+import base64 #n
+
 nltk.download('words')
+
 def decrypt_caesar(value: str) -> str:
     value = value.upper()
     possible_values = list()
@@ -55,7 +69,7 @@ def decrypt_RSA(value: str, n:int, b:str) ->str:
         char = int(char)
         if char == 32: continue
         new_value += chr(((char - 65)**b % n) + 65)
-    return new_value
+    return new_value, new_value
 
 def decrypt_permutation(value:str, m:str) -> str:
     #List all the inverse permutations
@@ -103,6 +117,279 @@ def decrypt_multiplicative(value: str) -> str:
     # Find the most likely English string
     mejor_palabra = get_most_english_string_letter_freq([x[0] for x in possible_values])
     return possible_values, mejor_palabra
+
+def modular_multiplicative_inverse(a, m):
+    """Helper function to find modular multiplicative inverse"""
+    def extended_gcd(a, b):
+        if a == 0:
+            return b, 0, 1
+        gcd, x1, y1 = extended_gcd(b % a, a)
+        x = y1 - (b // a) * x1
+        y = x1
+        return gcd, x, y
+
+    _, x, _ = extended_gcd(a, m)
+    return (x % m + m) % m
+
+def matrix_modulo_inverse(matrix, modulus):
+    """Calculate the inverse of a matrix in modulo 26"""
+    # Convert to integer matrix
+    matrix = matrix.astype(int)
+    
+    # Calculate determinant and its modular multiplicative inverse
+    det = int(round(np.linalg.det(matrix))) % modulus
+    det_inv = modular_multiplicative_inverse(det, modulus)
+    
+    # Calculate adjugate matrix
+    adj = np.round(np.linalg.det(matrix) * np.linalg.inv(matrix)).astype(int)
+    
+    # Calculate inverse modulo 26
+    inv_matrix = (det_inv * adj) % modulus
+    return inv_matrix
+
+def decrypt_hill(value: str, key: str) -> str:
+    # Convert key string to numpy matrix
+    matrix = np.matrix(key)
+    m = matrix.shape[0]  # Get matrix size (m x m)
+    
+    # Validate key matrix
+    if matrix.shape[0] != matrix.shape[1] or np.linalg.det(matrix) % 2 == 0 or np.linalg.det(matrix) % 13 == 0:
+        return "Invalid key", None
+    
+    # Calculate inverse matrix modulo 26
+    try:
+        inv_matrix = matrix_modulo_inverse(matrix, 26)
+    except:
+        return "Matrix is not invertible modulo 26", None
+    
+    value = value.upper()
+    new_value = ''
+    
+    # Process text in blocks of size m
+    for i in range(0, len(value), m):
+        block = np.zeros(m, dtype=int)
+        for j in range(m):
+            if i + j < len(value):
+                block[j] = ord(value[i + j]) - 65
+        
+        result = np.dot(inv_matrix, block) % 26
+        
+        for num in result.flat:
+            new_value += chr(int(num) + 65)
+    
+    return new_value, new_value
+    
+def decrypt_vigenere(value: str, key: str) -> str:
+    value = value.upper()
+    key = key.upper()
+    new_value = ''
+    extended_key = ''
+    for i in range(len(value)):
+        if value[i] == ' ':
+            continue
+        extended_key += key[i % len(key)]
+
+    key_pos = 0
+    
+    for char in value:
+        n_char = ord(char)
+        if n_char == 32:  # Skip spaces
+            continue
+            
+        shift = ord(extended_key[key_pos]) - 65
+    
+        new_char = chr(((n_char - 65 - shift) % 26) + 65)
+        new_value += new_char
+        
+        key_pos += 1
+        
+    return new_value, new_value
+
+def decrypt_AES(encrypted_str: str, key: str, iv:str,  mode: str) -> str:
+    """
+    Decrypts AES encrypted text from a base64 string.
+    
+    Args:
+        encrypted_str (str): Combined IV and ciphertext string from encrypt_AES
+        key_str (str): Base64 encoded key string
+        mode (str): AES mode used for encryption
+    """
+        
+    # Decode the components
+    iv = base64.b64decode(iv)
+    ciphertext = base64.b64decode(encrypted_str)
+    key = key.encode('utf-8')
+    if len(key) < 16:
+        key = key.ljust(16, b'\0')
+    elif len(key) < 24:
+        key = key[:16]
+    elif len(key) < 32:
+        key = key[:24]
+    else:
+        key = key[:32]
+        
+    # Create cipher object based on mode
+    if mode == 'CBC':
+        cipher = AES.new(key, AES.MODE_CBC, iv)
+    elif mode == 'CFB':
+        cipher = AES.new(key, AES.MODE_CFB, iv)
+    elif mode == 'OFB':
+        cipher = AES.new(key, AES.MODE_OFB, iv)
+    elif mode == 'CTR':
+        cipher = AES.new(key, AES.MODE_CTR, nonce=iv[:8])
+    elif mode == 'ECB':
+        cipher = AES.new(key, AES.MODE_ECB)
+            
+    # Decrypt and unpad
+    decrypted = unpad(cipher.decrypt(ciphertext), AES.block_size)
+    return decrypted.decode('utf-8'), None
+
+def decrypt_DES(encrypted_str: str, key: str, iv: str, mode: str) -> str:
+    """
+    Decrypts DES encrypted text from a base64 string.
+    
+    Args:
+        encrypted_str (str): Base64 encoded ciphertext
+        key (str): Encryption key
+        iv (str): Base64 encoded IV
+        mode (str): DES mode used for encryption
+    
+    Returns:
+        tuple: (decrypted_text, None)
+    """
+    # Decode the components
+    iv = base64.b64decode(iv)
+    ciphertext = base64.b64decode(encrypted_str)
+    
+    key = key.encode('utf-8')
+    if len(key) < 8:
+        key = key.ljust(8, b'\0')
+    else:
+        key = key[:8]
+    
+    # Create cipher object based on mode
+    if mode == 'CBC':
+        cipher = DES.new(key, DES.MODE_CBC, iv)
+    elif mode == 'CFB':
+        cipher = DES.new(key, DES.MODE_CFB, iv)
+    elif mode == 'OFB':
+        cipher = DES.new(key, DES.MODE_OFB, iv)
+    elif mode == 'CTR':
+        cipher = DES.new(key, DES.MODE_CTR, nonce=iv[:4])
+    elif mode == 'ECB':
+        cipher = DES.new(key, DES.MODE_ECB)
+    else:
+        raise ValueError("Invalid mode. Use 'CBC', 'CFB', 'OFB', 'CTR', or 'ECB'")
+    
+    decrypted = unpad(cipher.decrypt(ciphertext), DES.block_size)
+    return decrypted.decode('utf-8'), None
+
+def decrypt_DSA(signature: str, message: str, public_key: str) -> str:
+    """
+    Verifies a DSA signature.
+    
+    Args:
+        signature (str): Base64 encoded signature
+        message (str): Original message
+        public_key (str): Base64 encoded public key
+    
+    Returns:
+        tuple: (verification_result, None)
+    """
+    try:
+        # Decode the public key and signature from base64
+        public_key_pem = base64.b64decode(public_key)
+        signature = base64.b64decode(signature)
+        
+        # Import the public key
+        key = DSA.import_key(public_key_pem)
+        
+        # Create the hash object
+        hash_obj = SHA256.new(message.encode('utf-8'))
+        
+        # Verify the signature
+        verifier = DSS.new(key, 'fips-186-3')
+        try:
+            verifier.verify(hash_obj, signature)
+            return "Signature is valid", None
+        except ValueError:
+            return "Signature is invalid", None
+            
+    except Exception as e:
+        return f"Error in DSA verification: {str(e)}", None
+
+def decrypt_ElGamal(encrypted_b64: str, private_key_b64: str) -> str:
+    """
+    Decrypts El Gamal encrypted text.
+    
+    Args:
+        encrypted_b64 (str): Base64 encoded encrypted data
+        private_key_b64 (str): Base64 encoded private key
+    
+    Returns:
+        tuple: (decrypted_text, None)
+    """
+    try:
+        # Decode from base64 and parse JSON
+        encrypted_data = json.loads(base64.b64decode(encrypted_b64).decode())
+        private_key = json.loads(base64.b64decode(private_key_b64).decode())
+        
+        # Extract values
+        c1 = int(encrypted_data["c1"])
+        c2 = int(encrypted_data["c2"])
+        p = int(private_key["p"])
+        x = int(private_key["x"])
+        
+        # Calculate s = c1^x mod p
+        s = pow(c1, x, p)
+        
+        # Calculate s_inverse = s^(p-2) mod p
+        s_inverse = pow(s, p-2, p)
+        
+        # Recover M = c2 * s_inverse mod p
+        M = (c2 * s_inverse) % p
+        
+        # Convert number back to text
+        decrypted_text = ""
+        while M > 0:
+            char_code = M % 1000
+            decrypted_text = chr(char_code) + decrypted_text
+            M //= 1000
+            
+        return decrypted_text, None
+        
+    except Exception as e:
+        return f"Error in El Gamal decryption: {str(e)}", None
+
+def decrypt_image(input_image_path, output_image_path, key, iv_path):
+  # Read the IV from the separate file
+    key = key.encode('utf-8')
+    if len(key) < 16:
+        key = key.ljust(16, b'\0')
+    elif len(key) < 24:
+        key = key[:16]
+    elif len(key) < 32:
+        key = key[:24]
+    else:
+        key = key[:32]
+    with open(iv_path, 'rb') as f:
+        unique_iv = f.read()
+    # Read the encrypted data
+    with open(input_image_path, 'rb') as f:
+        encrypted_data = f.read()
+    # Separate the IV from the encrypted data
+    iv = encrypted_data[:AES.block_size]
+    encrypted_data = encrypted_data[AES.block_size:]
+    # Initialize AES cipher
+    cipher = AES.new(key, AES.MODE_CBC, unique_iv)
+    # Decrypt the image data
+    decrypted_data = unpad(cipher.decrypt(encrypted_data), AES.block_size)
+    # Convert decrypted bytes to image
+    decrypted_image = Image.open(io.BytesIO(decrypted_data))
+    # Save the decrypted image
+    decrypted_image.save(output_image_path, format=decrypted_image.format)
+    print(f"Decryption successful. Decrypted image saved to '{output_image_path}'.")
+    return None, None
 
 def train_ngram_model(corpus, n=3):
     model = Counter()
@@ -154,7 +441,36 @@ def get_most_english_string_letter_freq(strings):
 #####################################
 #####       ONLY FOR DEBUG      #####
 #####################################
+
+def main2(method: str, text: str, params: dict) -> str:
+    if method == 'caesar':
+        new_text, p1 = decrypt_caesar(text)
+    elif method == 'affine':
+        new_text, p1 = decrypt_afin(text)
+    elif method == 'multiplicative':
+        new_text, p1 = decrypt_multiplicative(text)
+    elif method == 'rsa':
+        new_text, p1 = decrypt_RSA(text, int(params['n']), int(params['pk']))
+    elif method == 'permutation':
+        new_text, p1 = decrypt_permutation(text, int(params['m']))
+    elif method == 'hill':
+        new_text, p1 = decrypt_hill(text, params['key'])
+    elif method == 'vigenere':
+        new_text, p1 = decrypt_vigenere(text, params['key'])
+    elif method == 'aes':
+        new_text, p1 = decrypt_AES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'des':
+        new_text, p1 = decrypt_DES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'dsa':
+        new_text, p1 = decrypt_DSA(text, params['message'], params['pk'])
+    elif method == 'elgamal':
+        new_text, p1 = decrypt_ElGamal(text, params['pk'])
+    elif method == 'image':
+        new_text, p1 = decrypt_image(params['input_image_path'], params['output_image_path'], params['key'], params['iv_path'])
+        
     
+    return new_text, p1
+
 def main(json_str):
     data = json.loads(json_str)
 
@@ -174,8 +490,69 @@ def main(json_str):
         result, best = decrypt_RSA(text, int(params['n']), int(params['pk']))
     elif method == 'permutation':
         result, best = decrypt_permutation(text, int(params['m']))
+    elif method == 'hill':
+        result, best = decrypt_hill(text, params['key'])
+    elif method == 'vigenere':
+        result, best = decrypt_vigenere(text, params['key'])
+    elif method == 'aes':
+        result, best = decrypt_AES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'des':
+        result, best = decrypt_DES(text, params['key'], params['iv'], params['mode'])
+    elif method == 'dsa':
+        result, best = decrypt_DSA(text, params['message'], params['pk'])
+    elif method == 'elgamal':
+        result, best = decrypt_ElGamal(text, params['pk'])
+    elif method == 'image':
+        result, best = decrypt_image(params['input_image_path'], params['output_image_path'], params['key'], params['iv_path'])
 
     return result, best
 
 if __name__ == "__main__":
-    main()
+    method = input("Method: ")
+    text = input("Text: ")
+    if method == 'rsa':
+        n = int(input("n: "))
+        pk = int(input("pk: "))
+        print(main2(method, text, {'n': n, 'pk': pk}))
+    elif method == 'caesar':
+        print(main2(method, text, {}))
+    elif method == 'affine':
+        print(main2(method, text, {}))
+    elif method == 'multiplicative':
+        print(main2(method, text, {}))
+    elif method == 'permutation':
+        m = int(input("m: "))
+        print(main2(method, text, {'m': m}))
+    elif method == 'hill':
+        key = input("key: ")
+        print(main2(method, text, {'key': key}))
+    elif method == 'vigenere':
+        key = input("key: ")
+        print(main2(method, text, {'key': key}))
+    elif method == 'aes':
+        key = input("key (english): ")
+        iv = input("iv(ciphered): ")
+        mode = input("mode: ")
+        print(main2(method, text, {'key': key, 'iv': iv, 'mode': mode}))
+    elif method == 'des':
+        key = input("key (english): ")
+        iv = input("iv(ciphered): ")
+        mode = input("mode: ")
+        print(main2(method, text, {'key': key, 'iv': iv, 'mode': mode}))
+    elif method == 'dsa':
+        pk = input("public key: ")
+        message = input("original text: ")
+        print(main2(method, text, {'pk': pk, 'message': message}))
+    elif method == 'elgamal':
+        pk = input("private key: ")
+        print(main2(method, text, {'pk': pk}))
+    elif method == 'image':
+        input_image_path = "out.jpg"
+        output_image_path = "decrypted.jpg"
+        key = input("key: ")
+        iv_path = "image.jpg.iv"
+        print(main2(method, text, {'input_image_path': input_image_path, 'output_image_path': output_image_path, 'key': key, 'iv_path': iv_path}))
+    else:
+        print("Invalid method")
+        sys.exit(1)
+    #main()
