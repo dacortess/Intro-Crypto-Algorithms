@@ -421,6 +421,7 @@ def encrypt_image(input_image_path, output_image_path, key):
         f.write(unique_iv)
     print(f"Encryption successful. Encrypted image saved to '{output_image_path}'.")
     print(f"IV file saved to '{iv_path}'.")
+    return output_image_path, unique_iv
 
 def view_encrypted_image(image_path):
     try:
@@ -448,7 +449,7 @@ def main(json_str: str) -> str:
             'Signature': '',
             'Public key': '',
             'Private key': '',
-            'Image'
+            'Image': ''
             }
 
     if method == 'caesar':
@@ -474,7 +475,7 @@ def main(json_str: str) -> str:
     elif method == 'elgamal':
         res['Encrypted text'], res['Public key'], res['Private key'] = encrypt_ElGamal(text, int(params['key_size']))
     elif method == "image":
-        res['Image'] = encrypt_image(params['key'])
+        res['Image'], res['IV'] = encrypt_image(params['key'])
 
     return res
 if __name__ == "__main__":
