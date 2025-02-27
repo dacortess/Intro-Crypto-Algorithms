@@ -180,8 +180,8 @@ def sign_file_route():
             
         return jsonify({
             'signature': signature,
-            'public_key': public_key,
-            'private_key': private_key
+            'publicKey': public_key,
+            'privateKey': private_key
         })
         
     except Exception as e:
