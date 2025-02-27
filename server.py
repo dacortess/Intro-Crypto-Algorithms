@@ -102,6 +102,7 @@ def encrypt_image_route():
         # Save the uploaded file temporarily
         temp_input = os.path.join(app.config['UPLOAD_FOLDER'], 'image.jpg')
         temp_output = os.path.join(app.config['UPLOAD_FOLDER'], 'encrypted_image.jpg')
+
         
         image_file.save(temp_input)
         
