@@ -64,19 +64,17 @@ def handle_python_script(script_name):
     try:
         data = request.json
 
-        best = ''
-
         if script_name == 'encrypt':
             result = encrypt.main(json.dumps(data))
         elif script_name == 'decrypt':
-            result, best = decrypt.main(json.dumps(data))
+            result = decrypt.main(json.dumps(data))
         elif script_name == 'analyze':
             result = analyze.main(json.dumps(data))
         else:
             return 'Invalid script name', 400
 
-        if best != '': return [result, best]
         return result
+
     except Exception as e:
         return str(e), 500
 
