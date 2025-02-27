@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template_string, send_file
+from flask import Flask, request, jsonify, render_template_string, send_file, send_from_directory
 from flask_cors import CORS
 import json
 import sys
@@ -6,6 +6,7 @@ import os
 import io
 from PIL import Image
 from werkzeug.utils import secure_filename
+import base64
 
 # Ajustar la ruta para incluir el directorio 'scripts'
 scripts_path = os.path.join(os.path.dirname(__file__), 'scripts')
@@ -108,24 +109,26 @@ def encrypt_image_route():
         # Encrypt the image
         output_path, iv = encrypt.encrypt_image(temp_input, temp_output, key)
         
-        # Read the encrypted file and prepare for sending
-        with open(output_path, 'rb') as f:
-            encrypted_data = f.read()
-            
-        # Clean up temporary files
-        os.remove(temp_input)
-        os.remove(temp_output)
+        # Convert IV to base64 for safe transmission
+        iv_b64 = base64.b64encode(iv).decode('utf-8')
         
-        # Create response with file download
-        return send_file(
-            io.BytesIO(encrypted_data),
-            mimetype='application/octet-stream',
-            as_attachment=True,
-            download_name=f'encrypted_{secure_filename(image_file.filename)}'
-        )
+        # Create a URL for the encrypted file
+        encrypted_image_url = f'https://dacortess.pythonanywhere.com/download/{os.path.basename(output_path)}'
+        
+        return jsonify({
+            'encrypted_image_url': encrypted_image_url,
+            'iv': iv_b64
+        })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 404
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
