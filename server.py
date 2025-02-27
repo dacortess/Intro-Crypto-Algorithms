@@ -118,33 +118,40 @@ def encrypt_image_route():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/decrypt-image', methods=['POST'])
-def encrypt_image_route():
+def decrypt_image_route():
     try:
         if 'image' not in request.files:
             return jsonify({'error': 'No image file provided'}), 400
         
         image_file = request.files['image']
         key = request.form.get('key', '')
-        iv = request.form.get('iv', '')
+        iv_b64 = request.form.get('iv', '')
         
         if not key:
             return jsonify({'error': 'No encryption key provided'}), 400
+        if not iv_b64:
+            return jsonify({'error': 'No IV provided'}), 400
+            
+        try:
+            # Decode the base64 IV back to bytes
+            iv = base64.b64decode(iv_b64)
+        except Exception as e:
+            return jsonify({'error': 'Invalid IV format'}), 400
             
         # Save the uploaded file temporarily
         temp_input = os.path.join('crypto', 'uploads', 'image2.jpg')
         temp_output = os.path.join('crypto', 'uploads', 'decrypted_image.jpg')
-
         
         image_file.save(temp_input)
         
-        # Encrypt the image
-        output_path= decrypt.decrypt_image(temp_input, temp_output, key, iv)
+        # Decrypt the image
+        output_path = decrypt.decrypt_image(temp_input, temp_output, key, iv)
         
-        # Create a URL for the encrypted file
-        encrypted_image_url = f'https://dacortess.pythonanywhere.com/download/{os.path.basename(output_path)}'
+        # Create a URL for the decrypted file
+        decrypted_image_url = f'https://dacortess.pythonanywhere.com/download/{os.path.basename(output_path)}'
         
         return jsonify({
-            'encrypted_image_url': encrypted_image_url,
+            'decrypted_image_url': decrypted_image_url,
         })
         
     except Exception as e:
