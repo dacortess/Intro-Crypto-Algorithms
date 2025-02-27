@@ -362,7 +362,7 @@ def decrypt_ElGammal(encrypted_b64: str, private_key_b64: str) -> str:
     except Exception as e:
         return f"Error in El Gamal decryption: {str(e)}"
 
-def decrypt_image(input_image_path, output_image_path, key, iv):
+def decrypt_image(input_image_path, output_image_path, key, unique_iv):
   # Read the IV from the separate file
     key = key.encode('utf-8')
     if len(key) < 16:
@@ -374,7 +374,6 @@ def decrypt_image(input_image_path, output_image_path, key, iv):
     else:
         key = key[:32]
 
-    unique_iv = iv
     # Read the encrypted data
     with open(input_image_path, 'rb') as f:
         encrypted_data = f.read()
@@ -517,7 +516,7 @@ def main(json_str):
     elif method == 'elgammal':
         res['Decrypted text']  = decrypt_ElGammal(text, params['privateKey'])
     elif method == 'image':
-        result, best = decrypt_image(params['input_image_path'], params['output_image_path'], params['key'], params['iv_path'])
+        result, best = decrypt_image(params['input_image_path'], params['output_image_path'], params['key'], params['iv'])
 
     return res
 
