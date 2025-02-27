@@ -433,6 +433,40 @@ def view_encrypted_image(image_path):
     except Exception as e:
         print(f"Error opening image: {e}")
 
+def sign_file_DSA(file_path: str, key_size: int = 2048) -> tuple:
+    """
+    Generates DSA keys and signs a file.
+    
+    Args:
+        file_path (str): Path to the file to sign
+        key_size (int): Size of the key in bits (1024, 2048, or 3072)
+    
+    Returns:
+        tuple: (signature_string, public_key_string, private_key_string)
+    """
+    try:
+        # Read the file in binary mode
+        with open(file_path, 'rb') as file:
+            file_data = file.read()
+        
+        # Generate new DSA key
+        key = DSA.generate(key_size)
+        
+        # Export keys in PEM format and encode to base64
+        private_key = base64.b64encode(key.export_key()).decode('utf-8')
+        public_key = base64.b64encode(key.publickey().export_key()).decode('utf-8')
+        
+        # Create the hash object and sign
+        hash_obj = SHA256.new(file_data)
+        signer = DSS.new(key, 'fips-186-3')
+        signature = signer.sign(hash_obj)
+        
+        # Encode signature to base64
+        signature_b64 = base64.b64encode(signature).decode('utf-8')
+        
+        return signature_b64, public_key, private_key
+    except Exception as e:
+        return f"Error in DSA file signing: {str(e)}", None, None
 
 def main(json_str: str) -> str:
     data = json.loads(json_str)

@@ -392,6 +392,44 @@ def decrypt_image(input_image_path, output_image_path, key, iv_path):
     print(f"Decryption successful. Decrypted image saved to '{output_image_path}'.")
     return None, None
 
+def verify_file_DSA(file_path: str, signature: str, public_key: str) -> tuple:
+    """
+    Verifies a DSA signature for a file.
+    
+    Args:
+        file_path (str): Path to the file to verify
+        signature (str): Base64 encoded signature
+        public_key (str): Base64 encoded public key
+    
+    Returns:
+        tuple: (verification_result, None)
+    """
+    try:
+        # Read the file in binary mode
+        with open(file_path, 'rb') as file:
+            file_data = file.read()
+        
+        # Decode the public key and signature from base64
+        public_key_pem = base64.b64decode(public_key)
+        signature = base64.b64decode(signature)
+        
+        # Import the public key
+        key = DSA.import_key(public_key_pem)
+        
+        # Create the hash object
+        hash_obj = SHA256.new(file_data)
+        
+        # Verify the signature
+        verifier = DSS.new(key, 'fips-186-3')
+        try:
+            verifier.verify(hash_obj, signature)
+            return "Signature is valid", None
+        except ValueError:
+            return "Signature is invalid", None
+            
+    except Exception as e:
+        return f"Error in DSA file verification: {str(e)}", None
+
 def train_ngram_model(corpus, n=3):
     model = Counter()
     for word in corpus:
