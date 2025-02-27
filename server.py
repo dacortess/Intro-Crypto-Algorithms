@@ -94,8 +94,8 @@ def encrypt_image_route():
             return jsonify({'error': 'No encryption key provided'}), 400
             
         # Save the uploaded file temporarily
-        temp_input = os.path.join('uploads', 'image.jpg')
-        temp_output = os.path.join('uploads', 'encrypted_image.jpg')
+        temp_input = os.path.join('crypto', 'uploads', 'image.jpg')
+        temp_output = os.path.join('crypto', 'uploads', 'encrypted_image.jpg')
 
         
         image_file.save(temp_input)
