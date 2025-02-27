@@ -18,12 +18,6 @@ import analyze
 app = Flask(__name__)
 CORS(app)
 
-# Configure upload folder
-UPLOAD_FOLDER = 'uploads'
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-
 # Página principal con información del proyecto
 @app.route('/', methods=['GET'])
 def home():
@@ -100,8 +94,8 @@ def encrypt_image_route():
             return jsonify({'error': 'No encryption key provided'}), 400
             
         # Save the uploaded file temporarily
-        temp_input = os.path.join(app.config['UPLOAD_FOLDER'], 'image.jpg')
-        temp_output = os.path.join(app.config['UPLOAD_FOLDER'], 'encrypted_image.jpg')
+        temp_input = os.path.join('uploads', 'image.jpg')
+        temp_output = os.path.join('uploads', 'encrypted_image.jpg')
 
         
         image_file.save(temp_input)
@@ -126,7 +120,7 @@ def encrypt_image_route():
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
-        return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
+        return send_from_directory('uploads', filename, as_attachment=True)
     except Exception as e:
         return jsonify({'error': str(e)}), 404
 
