@@ -5,7 +5,6 @@ import sys
 import os
 import io
 from PIL import Image
-from werkzeug.utils import secure_filename
 import base64
 
 # Ajustar la ruta para incluir el directorio 'scripts'
@@ -101,8 +100,8 @@ def encrypt_image_route():
             return jsonify({'error': 'No encryption key provided'}), 400
             
         # Save the uploaded file temporarily
-        temp_input = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(image_file.filename))
-        temp_output = os.path.join(app.config['UPLOAD_FOLDER'], f'encrypted_{secure_filename(image_file.filename)}')
+        temp_input = os.path.join(app.config['UPLOAD_FOLDER'], 'image.jpg')
+        temp_output = os.path.join(app.config['UPLOAD_FOLDER'], 'encrypted_image.jpg')
         
         image_file.save(temp_input)
         
