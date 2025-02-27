@@ -424,6 +424,41 @@ def encrypt_image(input_image_path, output_image_path, key):
     print(f"IV file saved to '{iv_path}'.")
     return None, None, None
 
+def sign_file_DSA(file_path: str, key_size: int = 2048) -> tuple:
+    """
+    Generates DSA keys and signs a file.
+    
+    Args:
+        file_path (str): Path to the file to sign
+        key_size (int): Size of the key in bits (1024, 2048, or 3072)
+    
+    Returns:
+        tuple: (signature_string, public_key_string, private_key_string)
+    """
+    try:
+        # Read the file in binary mode
+        with open(file_path, 'rb') as file:
+            file_data = file.read()
+        
+        # Generate new DSA key
+        key = DSA.generate(key_size)
+        
+        # Export keys in PEM format and encode to base64
+        private_key = base64.b64encode(key.export_key()).decode('utf-8')
+        public_key = base64.b64encode(key.publickey().export_key()).decode('utf-8')
+        
+        # Create the hash object and sign
+        hash_obj = SHA256.new(file_data)
+        signer = DSS.new(key, 'fips-186-3')
+        signature = signer.sign(hash_obj)
+        
+        # Encode signature to base64
+        signature_b64 = base64.b64encode(signature).decode('utf-8')
+        
+        return signature_b64, public_key, private_key
+    except Exception as e:
+        return f"Error in DSA file signing: {str(e)}", None, None
+
 def view_encrypted_image(image_path):
     try:
         # Open the image file
@@ -460,7 +495,8 @@ def main2(method: str, text: str, params: dict) -> str:
         new_text, p1, p2 = encrypt_ElGamal(text, int(params['key_size']))
     elif method == "image":
         new_text, p1, p2 = encrypt_image(params['input_image_path'], params['output_image_path'], params['key'])
-        
+    elif method == "sign_file_DSA":
+        new_text, p1, p2 = sign_file_DSA(text, int(params['key_size']))
 
 
     return new_text, p1, p2
@@ -498,6 +534,8 @@ def main(json_str: str) -> str:
     elif method == "image":
         new_text, p1, p2 = encrypt_image(params['input_image_path'], params['output_image_path'], params['key'])
         view_encrypted_image(params['output_image_path'])
+    elif method == "sign_file_DSA":
+        new_text, p1, p2 = sign_file_DSA(text, int(params ['key_size']))
 
 
     return new_text, p1, p2
@@ -548,4 +586,7 @@ if __name__ == "__main__":
         output_image_path = "out.jpg"
         key = input("Key: ")
         print(main2(method, text, {'input_image_path': input_image_path, 'output_image_path': output_image_path, 'key': key}))
+    elif method == 'sign_file_DSA':
+        key_size = int(input("Key size(1024 or 2048 recommended): "))
+        print(main2(method, text, {'key_size': key_size}))
     #print(main(sys.argv[1]))
