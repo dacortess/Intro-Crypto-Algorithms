@@ -166,7 +166,7 @@ def sign_file_route():
         file = request.files['file']
         
         # Save the uploaded file temporarily
-        temp_file = os.path.join('uploads', file.filename)
+        temp_file = os.path.join('crypto', 'uploads', 'dsa_file')
         file.save(temp_file)
         
         # Sign the file using DSA
@@ -204,7 +204,7 @@ def verify_file_route():
         public_key = request.form['public_key']
         
         # Save the uploaded file temporarily
-        temp_file = os.path.join('uploads', file.filename)
+        temp_file = os.path.join('crypto', 'uploads', 'dsa_file')
         file.save(temp_file)
         
         # Verify the file signature
