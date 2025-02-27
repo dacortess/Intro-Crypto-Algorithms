@@ -157,6 +157,69 @@ def decrypt_image_route():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/sign-file', methods=['POST'])
+def sign_file_route():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+            
+        file = request.files['file']
+        
+        # Save the uploaded file temporarily
+        temp_file = os.path.join('uploads', file.filename)
+        file.save(temp_file)
+        
+        # Sign the file using DSA
+        signature, public_key, private_key = encrypt.sign_file_DSA(temp_file)
+        
+        # Remove temporary file
+        os.remove(temp_file)
+        
+        if signature is None or public_key is None:
+            return jsonify({'error': 'Error signing file'}), 500
+            
+        return jsonify({
+            'signature': signature,
+            'public_key': public_key,
+            'private_key': private_key
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/verify-file', methods=['POST'])
+def verify_file_route():
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+            
+        if 'signature' not in request.form:
+            return jsonify({'error': 'No signature provided'}), 400
+            
+        if 'public_key' not in request.form:
+            return jsonify({'error': 'No public key provided'}), 400
+            
+        file = request.files['file']
+        signature = request.form['signature']
+        public_key = request.form['public_key']
+        
+        # Save the uploaded file temporarily
+        temp_file = os.path.join('uploads', file.filename)
+        file.save(temp_file)
+        
+        # Verify the file signature
+        verification_result, _ = decrypt.verify_file_DSA(temp_file, signature, public_key)
+        
+        # Remove temporary file
+        os.remove(temp_file)
+        
+        return jsonify({
+            'verification_result': verification_result
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/download/<filename>')
 def download_file(filename):
     try:
