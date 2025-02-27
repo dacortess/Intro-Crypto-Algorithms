@@ -16,6 +16,7 @@ import base64 #n
 import io #n
 import os #n
 from PIL import Image #n
+from flask import jsonify, send_file
 
 def encrypt_caesar(text: str, a: int) -> str:
 
@@ -475,7 +476,9 @@ def main(json_str: str) -> str:
     elif method == 'elgamal':
         res['Encrypted text'], res['Public key'], res['Private key'] = encrypt_ElGamal(text, int(params['key_size']))
     elif method == "image":
-        res['Image'], res['IV'] = encrypt_image(params['key'])
+        if 'image' not in request['files']['image']: 
+            return jsonify({"error": "No image file provided"}), 400
+        res['Image'], res['IV'] = encrypt_image('image.jpg', 'out.jpg', params['key'])
 
     return res
 if __name__ == "__main__":

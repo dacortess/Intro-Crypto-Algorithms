@@ -1,8 +1,11 @@
-from flask import Flask, request, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string, send_file
 from flask_cors import CORS
 import json
 import sys
 import os
+import io
+from PIL import Image
+from werkzeug.utils import secure_filename
 
 # Ajustar la ruta para incluir el directorio 'scripts'
 scripts_path = os.path.join(os.path.dirname(__file__), 'scripts')
@@ -14,6 +17,12 @@ import analyze
 
 app = Flask(__name__)
 CORS(app)
+
+# Configure upload folder
+UPLOAD_FOLDER = 'uploads'
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Página principal con información del proyecto
 @app.route('/', methods=['GET'])
@@ -78,4 +87,45 @@ def handle_python_script(script_name):
     except Exception as e:
         return str(e), 500
 
-# Eliminar app.run() ya que PythonAnywhere se encarga de ejecutarlo.
+@app.route('/encrypt-image', methods=['POST'])
+def encrypt_image_route():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image file provided'}), 400
+        
+        image_file = request.files['image']
+        key = request.form.get('key', '')
+        
+        if not key:
+            return jsonify({'error': 'No encryption key provided'}), 400
+            
+        # Save the uploaded file temporarily
+        temp_input = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(image_file.filename))
+        temp_output = os.path.join(app.config['UPLOAD_FOLDER'], f'encrypted_{secure_filename(image_file.filename)}')
+        
+        image_file.save(temp_input)
+        
+        # Encrypt the image
+        output_path, iv = encrypt.encrypt_image(temp_input, temp_output, key)
+        
+        # Read the encrypted file and prepare for sending
+        with open(output_path, 'rb') as f:
+            encrypted_data = f.read()
+            
+        # Clean up temporary files
+        os.remove(temp_input)
+        os.remove(temp_output)
+        
+        # Create response with file download
+        return send_file(
+            io.BytesIO(encrypted_data),
+            mimetype='application/octet-stream',
+            as_attachment=True,
+            download_name=f'encrypted_{secure_filename(image_file.filename)}'
+        )
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+if __name__ == '__main__':
+    app.run(debug=True, port=5000)
