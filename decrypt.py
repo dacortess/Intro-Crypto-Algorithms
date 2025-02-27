@@ -362,7 +362,7 @@ def decrypt_ElGammal(encrypted_b64: str, private_key_b64: str) -> str:
     except Exception as e:
         return f"Error in El Gamal decryption: {str(e)}"
 
-def decrypt_image(input_image_path, output_image_path, key, iv_path):
+def decrypt_image(input_image_path, output_image_path, key, iv):
   # Read the IV from the separate file
     key = key.encode('utf-8')
     if len(key) < 16:
@@ -373,8 +373,8 @@ def decrypt_image(input_image_path, output_image_path, key, iv_path):
         key = key[:24]
     else:
         key = key[:32]
-    with open(iv_path, 'rb') as f:
-        unique_iv = f.read()
+
+    unique_iv = iv
     # Read the encrypted data
     with open(input_image_path, 'rb') as f:
         encrypted_data = f.read()
@@ -390,7 +390,7 @@ def decrypt_image(input_image_path, output_image_path, key, iv_path):
     # Save the decrypted image
     decrypted_image.save(output_image_path, format=decrypted_image.format)
     print(f"Decryption successful. Decrypted image saved to '{output_image_path}'.")
-    return None, None
+    return output_image_path
 
 def verify_file_DSA(file_path: str, signature: str, public_key: str) -> tuple:
     """
